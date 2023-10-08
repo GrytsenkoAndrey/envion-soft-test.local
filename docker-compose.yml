@@ -1,0 +1,77 @@
+# mkcert -cert-file=envion-soft-test.local+1.pem -key-file=envion-soft-test.local+1-key.pem envion-soft-test.local www.envion-soft-test.local
+# .env - DOCKER_PREFIX=est
+#
+# if by php serve
+#docker-compose exec est-app php artisan serve --port=8000 --host=0.0.0.0
+
+# sudo chown -R $USER:$USER ./
+
+version: "3"
+services:
+
+  #php
+  app:
+    build:
+      context: .
+      dockerfile: ./docker/php-fpm/Dockerfile
+    image: digitalocean.com/php
+    container_name: "${DOCKER_PREFIX}-app"
+    restart: always
+    tty: true
+    depends_on:
+      - db
+    environment:
+      SERVICE_NAME: app
+      SERVICE_TAGS: dev
+    working_dir: /var/www
+    user: "1000:1000"
+    volumes:
+      - ./:/var/www
+      - ./docker/php-fpm/local.ini:/usr/local/etc/php/conf.d/php.ini
+    networks:
+      - app-network
+
+  #postgres
+  db:
+    image: postgres:16-alpine
+    container_name: "${DOCKER_PREFIX}-db"
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
+    volumes:
+      - ./docker/postgres:/var/lib/postgresql/data
+    ports:
+      - "${DOCKER_DB_PORT:-5432}:5432"
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-q", "-d", "${DB_DATABASE}", "-U", "${DB_USERNAME}" ]
+      retries: 3
+      timeout: 5s
+
+  #nginx
+  webserver:
+    image: nginx:1.19.7-alpine
+    container_name: "${DOCKER_PREFIX}-server"
+    restart: always
+    tty: true
+    depends_on:
+      - app
+    ports:
+      - "${DOCKER_HOST_PORT}:80"
+    volumes:
+      - ./:/var/www
+      - ./docker/nginx/local.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - app-network
+
+#networks
+networks:
+  app-network:
+    driver: bridge
+#volumes
+volumes:
+  postgres:
+    driver: local

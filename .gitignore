@@ -17,6 +17,4 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
-/docker/
-docker-compose.yml
-Makefile
+/docker/postgres
